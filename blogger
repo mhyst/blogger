@@ -1,0 +1,74 @@
+#!/bin/bash
+#Subir articulos antiguos de la base de datos a blogger
+
+source /home/mhyst/bin/scripts/blogger/database
+
+declare -A ARTICULO
+
+#@ film.parse datos (Formato: (id|titulo|fichero|torrent|esserie|esvisto|esdescargado))
+function parse() {
+	local datos="$1"
+
+	#echo "$datos" > /dev/tty
+
+	IFS='|' read -a datosa <<< "$datos"; IFS=" "
+
+	#ARTICULO[ver]="${datosa[1]}"
+	ARTICULO[id]="${datosa[0]}"
+	#ARTICULO[user]="${datosa[3]}"
+	#ARTICULO[date]="${datosa[4]}"
+	#ARTICULO[status]="${datosa[5]}"
+	ARTICULO[title]="${datosa[1]}"
+	ARTICULO[content]="${datosa[2]}"
+
+	# echo "-----------------------------"
+	# echo "Campos: ${#datosa[@]}/${#ARTICULO[@]}"
+	# echo "ver_id> ${ARTICULO[ver]}"
+	# echo "item_id> ${ARTICULO[id]}"
+	# echo "user_id> ${ARTICULO[user]}"
+	# echo "date> ${ARTICULO[date]}"
+	# echo "status> ${ARTICULO[status]}"
+	# echo "title> ${ARTICULO[title]}"
+	# echo "content> ${ARTICULO[content]}"
+	# echo "-----------------------------"
+}
+
+datos=$(db.executeQuery "select distinct iver_itm_ID, iver_title, iver_content from evo_items__version as a where a.iver_edit_datetime = (select max(iver_edit_datetime) from evo_items__version as b where b.iver_itm_ID = a.iver_itm_ID) order by a.iver_edit_datetime")
+
+if [[ "$datos" == "" ]]; then
+        echo "No hay artículos" > /dev/tty
+        exit
+fi
+
+readarray -t datosa <<< "$datos"
+
+echo "Artículos encontrados: ${#datosa[@]}" > /dev/tty
+if [[ ${#datosa[@]} == 0 ]]; then
+        echo "No hay artículos" > /dev/tty
+        exit
+fi
+
+let i=0
+for post in "${datosa[@]}"; do
+        parse "$post"
+        
+        texto=$(sed 's/>rn</></g' <<< "${ARTICULO[content]}")
+        texto=$(sed 's/\&gt;/>/g' <<< "$texto")
+        texto=$(sed 's/\&lt;/</g' <<< "$texto")
+
+        echo "$texto" > /tmp/blogger.html
+
+        texto=$(w3m -dump /tmp/blogger.html)
+        #texto="${ARTICULO[content]}"
+        echo
+        echo "-----------------------------------------"
+        echo "$texto"
+        echo "-----------------------------------------"
+        echo
+
+        echo "$i - ${ARTICULO[title]}" > /dev/tty
+        echo "$texto" | mutt -s "${ARTICULO[title]}" mhyst_el_otro.zenzen@blogger.com
+        sleep 45s
+        (( i++ ))
+done
+echo "$i artículos enviados"
