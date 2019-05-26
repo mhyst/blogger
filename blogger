@@ -52,8 +52,7 @@ let i=0
 for post in "${datosa[@]}"; do
         parse "$post"
         
-        texto=$(sed 's/>rn</></g' <<< "${ARTICULO[content]}")
-        texto=$(sed 's/\&gt;/>/g' <<< "$texto")
+        texto=$(sed 's/\&gt;/>/g' <<< "${ARTICULO[content]}")
         texto=$(sed 's/\&lt;/</g' <<< "$texto")
 
         echo "$texto" > /tmp/blogger.html
